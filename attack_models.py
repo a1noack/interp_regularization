@@ -6,6 +6,7 @@ import ir_utils.dataloaders as dataloaders
 from advertorch.attacks import GradientSignAttack, CarliniWagnerL2Attack, PGDAttack
 from ir_utils.cmd_args import cmd_args as args
 from ir_utils.utils import train_types, mean_confidence_interval
+from ir_utils import simple_models
 
 def test():
     correct = 0
@@ -41,7 +42,14 @@ elif args.dataset == 'MNIST':
 adv_test_accuracies = []
 test_accuracies = []
 
-print(f'Attacking {args.n_seeds} {args.model_name} models with {train_types[args.train_type]}\n')
+if args.norm == 'inf':
+    norm = np.inf
+elif args.norm == '2':
+    norm = 2
+
+print(f'Attacking {args.n_seeds} {args.model_name} models with {train_types[args.train_type]}')
+print(f'Attack is {args.attack_type}-{args.iters}\n')
+
 for i in range(args.n_seeds):
     # create network structure
     if args.model_name == 'WRN-28-10':
@@ -52,13 +60,13 @@ for i in range(args.n_seeds):
         net = wide_resnet.Wide_ResNet(depth=16, widen_factor=10, 
                                       dropout_rate=args.dropout, 
                                       num_classes=args.n_classes)
-    elif args.model_name == 'LeNet':
-        net = simple_models.LeNet()
+    elif args.model_name == 'SimpleCNN':
+        net = simple_models.SimpleCNN()
     
     # load saved model's parameters
     model_path = f'{args.save_dir}/{args.dataset}/{args.model_name}_{args.train_type}/model{i}'
     try:
-        net.load_state_dict(torch.load(model_path))
+        net.load_state_dict(torch.load(model_path, map_location=device))
     except:
         print(f'CANNOT LOAD MODEL AT: {model_path}')
         continue
@@ -70,7 +78,7 @@ for i in range(args.n_seeds):
     if args.attack_type == 'PGD':
         adversary = PGDAttack(predict=net, loss_fn=F.cross_entropy, eps=args.epsilon,
              nb_iter=args.iters, eps_iter=args.step_size, rand_init=True,
-             clip_min=args.clip_min, clip_max=args.clip_max, ord=args.norm, targeted=args.targeted)
+             clip_min=args.clip_min, clip_max=args.clip_max, ord=norm, targeted=args.targeted)
     elif args.attack_type == 'CW':
         adversary = CarliniWagnerL2Attack(predict=net, num_classes=args.n_classes, confidence=0,
              targeted=args.targeted, learning_rate=0.01,
@@ -84,5 +92,5 @@ for i in range(args.n_seeds):
 adv_ci = mean_confidence_interval(adv_test_accuracies)
 std_ci = mean_confidence_interval(test_accuracies)
 
-print(f'adversarial test accuracy: {adv_ci[0]:.2f} +/- {adv_ci[1]:.2f}')
+print(f'\nadversarial test accuracy: {adv_ci[0]:.2f} +/- {adv_ci[1]:.2f}')
 print(f'standard test accuracy: {std_ci[0]:.2f} +/- {std_ci[1]:.2f}')
