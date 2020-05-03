@@ -77,9 +77,9 @@ class Wide_ResNet(nn.Module):
         out = F.relu(self.bn1(out))
         out = F.avg_pool2d(out, 8)
         out = out.view(out.size(0), -1)
-        out = self.linear(out)
+        self.logits = self.linear(out)
 
-        return out
+        return self.logits
 
 if __name__ == '__main__':
     net=Wide_ResNet(28, 10, 0.3, 10)

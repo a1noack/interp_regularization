@@ -25,14 +25,17 @@ cmd_opt.add_argument('-gpu', type=int, default=0, help='which GPU to use')
 cmd_opt.add_argument('-print_freq', type=int, default=5, help='which epochs to print training stats')
 cmd_opt.add_argument('-n_seeds', type=int, default=5, help='how many models to train with the current settings')
 
+cmd_opt.add_argument('-lambda_jr', type=float, default=4e-3, help='loss regularization weight value')
+cmd_opt.add_argument('-lambda_ir', type=float, default=4e-3, help='loss regularization weight value')
+
 # for adversary
 cmd_opt.add_argument('-attack_type', type=str, default='PGD', help='which norm is used to bound adversary default l_inf')
-cmd_opt.add_argument('-norm', type=float, default=np.inf, help='which norm is used to bound adversary default l_inf')
+cmd_opt.add_argument('-norm', type=str, default='inf', help='which norm is used to bound adversary default l_inf')
 cmd_opt.add_argument('-epsilon', type=float, default=8/255., help='maximum magnitude adversary can perturb input by')
 cmd_opt.add_argument('-step_size', type=float, default=2/255., help='step size adversary for each iteration for PGD')
 cmd_opt.add_argument('-iters', type=int, default=7, help='attack iterations')
 cmd_opt.add_argument('-clip_min', type=float, default=0., help='minimum value pixel can have')
 cmd_opt.add_argument('-clip_max', type=float, default=1., help='maximum value pixel can have')
-cmd_opt.add_argument('-targeted', type=bool, default=False, help='whether attack is targeted or not')
+cmd_opt.add_argument('-targeted', type=int, default=0, help='1 => target, 0 => untargeted')
 
 cmd_args, _ = cmd_opt.parse_known_args()

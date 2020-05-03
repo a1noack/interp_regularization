@@ -13,14 +13,14 @@ def cifar10(batch_size=128):
     ])
 
     train_loader = torch.utils.data.DataLoader(
-        torchvision.datasets.CIFAR10('../data', train=True, download=True,
+        torchvision.datasets.CIFAR10('data/CIFAR-10', train=True, download=True,
              transform=train_transform), 
         batch_size=batch_size, 
         shuffle=True
     )
 
     test_loader = torch.utils.data.DataLoader(
-        torchvision.datasets.CIFAR10('../data', train=False, download=True,
+        torchvision.datasets.CIFAR10('data/CIFAR-10', train=False, download=True,
              transform=test_transform),
         batch_size=batch_size, 
         shuffle=False
@@ -28,22 +28,22 @@ def cifar10(batch_size=128):
     
     return train_loader, test_loader
     
-def mnist():
+def mnist(batch_size=64):
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor()]
     )
 
     train_loader = torch.utils.data.DataLoader(
-        torchvision.datasets.MNIST(path, train=True, download=True,
+        torchvision.datasets.MNIST('data/MNIST', train=True, download=True,
              transform=transform), 
-        batch_size=tr_batch_size, 
+        batch_size=batch_size, 
         shuffle=True
     )
 
     test_loader = torch.utils.data.DataLoader(
-        torchvision.datasets.MNIST(path, train=False, download=True,
+        torchvision.datasets.MNIST('data/MNIST', train=False, download=True,
              transform=transform),
-        batch_size=te_batch_size, 
+        batch_size=batch_size, 
         shuffle=False
     )
     
