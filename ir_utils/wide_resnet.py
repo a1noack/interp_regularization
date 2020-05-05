@@ -78,7 +78,7 @@ class Wide_ResNet(nn.Module):
         out = F.avg_pool2d(out, 8)
         out = out.view(out.size(0), -1)
         self.logits = self.linear(out)
-        self.probabilities = self.logits
+        self.probabilities = F.softmax(self.logits, dim=1)
 
         return self.probabilities
 
