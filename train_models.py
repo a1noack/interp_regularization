@@ -10,11 +10,11 @@ import ir_utils.simple_models as simple_models
 import ir_utils.wide_resnet as wide_resnet
 from ir_utils.cmd_args import cmd_args as args
 from ir_utils.utils import train_types
-from ir_utils.loss_utils import avg_norm_jac
+from ir_utils.loss_utils import avg_norm_jac, avg_norm_im
 import ir_utils.dataloaders as dataloaders
 
 # this function runs both training and test passes through data
-def datapass(dataloader, train=True):
+def datapass(dataloader, train=True, adv_test=False):
     if train:
         net.train()
     else:
@@ -22,19 +22,23 @@ def datapass(dataloader, train=True):
     
     num_correct = 0
     total_loss = 0
-    for batch_idx, (samples, labels) in enumerate(dataloader):
-        samples, labels = samples.to(device), labels.to(device)
-        if train and args.train_type == 'at':
+    for batch_idx, batch_data in enumerate(dataloader):
+        if len(batch_data) == 2:
+            samples, labels = [x.to(device) for x in batch_data]
+        else:
+            samples, labels, target_interps = [x.to(device) for x in batch_data]
+            
+        if train and (args.train_type == 'at' or adv_test):
             samples = adversary.perturb(samples, labels)
         
         outputs = net(samples)
-        if args.model_name == 'SimpleCNN':
-            outputs = net.probabilities
             
         loss = F.cross_entropy(outputs, labels)
         
         if args.train_type == 'jr':
             loss += args.lambda_jr * avg_norm_jac(net, samples, args.n_classes, args.gpu)
+        elif args.train_type == 'ir':
+            loss += args.lambda_ir * avg_norm_im(net, samples, labels, target_interps, args.n_classes, args.gpu)
         
         preds = torch.argmax(outputs, dim=1)
         num_correct += torch.eq(preds, labels).sum().item()
@@ -50,12 +54,17 @@ def datapass(dataloader, train=True):
 # set device
 device = torch.device(args.gpu if torch.cuda.is_available() else 'cpu')
 torch.cuda.set_device(device)
+if device != 'cpu':
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 # get dataloaders
 if args.dataset == 'CIFAR-10':
     train_loader, test_loader = dataloaders.cifar10()
 elif args.dataset == 'MNIST':
-    train_loader, test_loader = dataloaders.mnist()
+    if args.train_type == 'ir':
+        train_loader, test_loader = dataloaders.mnist_interps(smoothgrad=False)
+    else:
+        train_loader, test_loader = dataloaders.mnist()
     
 if args.norm == 'inf':
     norm = np.inf
@@ -65,7 +74,11 @@ elif args.norm == '2':
 print(f'Training {args.n_seeds} {args.model_name} models with {train_types[args.train_type]}.\n')
 
 for model_num in range(args.n_seeds):
-    model_path = f'{args.save_dir}/{args.dataset}/{args.model_name}_{args.train_type}/model{model_num}'
+    model_path = f'{args.save_dir}/{args.dataset}/{args.model_name}_{args.train_type}/'
+    if args.train_type == 'ir':
+        model_path = model_path + f'model_ir{args.lambda_ir}_{model_num}'
+    elif args.train_type == 'jr':
+        model_path = model_path + f'model_jr{args.lambda_jr}_{model_num}'
 
     start = time.time()
     
@@ -82,10 +95,9 @@ for model_num in range(args.n_seeds):
         
     net.cuda()
     
-    if args.train_type == 'at':
-        adversary = PGDAttack(predict=net, loss_fn=F.cross_entropy, eps=args.epsilon,
-              nb_iter=args.iters, eps_iter=args.step_size, rand_init=True,
-              clip_min=args.clip_min, clip_max=args.clip_max, ord=norm, targeted=args.targeted)
+    adversary = PGDAttack(predict=net, loss_fn=F.cross_entropy, eps=args.epsilon,
+          nb_iter=args.iters, eps_iter=args.step_size, rand_init=True,
+          clip_min=args.clip_min, clip_max=args.clip_max, ord=norm, targeted=args.targeted)
     
     optimizer = optim.SGD(net.parameters(), lr=args.lr, 
           momentum=args.momentum, 
@@ -102,8 +114,12 @@ for model_num in range(args.n_seeds):
         
         if epoch % args.print_freq == 0:
             test_acc, test_loss = datapass(test_loader, train=False)
-            print('Epoch #{}:\tTrain loss: {:.4f}\tTrain acc: {:.4f}\tTest loss: {:.4f}\tTest acc: {:.4f}'.format(epoch, train_loss, train_acc, test_loss, test_acc))
+            print(f'Epoch #{epoch}:\tTrain loss: {train_loss:.4f}\tTrain acc: {train_acc:.4f}\tTest loss: {test_loss:.4f}\tTest acc: {test_acc:.4f}')
         lr_decayer.step()
     torch.save(net.state_dict(), model_path)
+    adv_acc, _ = datapass(test_loader, train=False, adv_test=True)
+    print(f'Adv. test acc: {adv_acc:.4f}')
+    print(f'Attack is {args.attack_type}-{args.iters}, l_{args.norm} norm, epsilon = {args.epsilon}, \
+      \n\tstep size = {args.step_size}, iters = {args.iters}\n')
     
     print(f'\nTotal train time: {(time.time()-start)/60:.1f} minutes\n\n')

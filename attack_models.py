@@ -48,9 +48,10 @@ elif args.norm == '2':
     norm = 2
 
 print(f'Attacking {args.n_seeds} {args.model_name} models with {train_types[args.train_type]}')
-print(f'Attack is {args.attack_type}-{args.iters}\n')
+print(f'Attack is {args.attack_type}-{args.iters}, l_{args.norm} norm, epsilon = {args.epsilon}, \
+      \n\tstep size = {args.step_size}, iters = {args.iters}\n')
 
-for i in range(args.n_seeds):
+for model_num in range(args.n_seeds):
     # create network structure
     if args.model_name == 'WRN-28-10':
         net = wide_resnet.Wide_ResNet(depth=28, widen_factor=10, 
@@ -64,7 +65,14 @@ for i in range(args.n_seeds):
         net = simple_models.SimpleCNN()
     
     # load saved model's parameters
-    model_path = f'{args.save_dir}/{args.dataset}/{args.model_name}_{args.train_type}/model{i}'
+    model_path = f'{args.save_dir}/{args.dataset}/{args.model_name}_{args.train_type}/'
+    if args.train_type == 'ir':
+        model_path = model_path + f'model_ir{args.lambda_ir}_{model_num}'
+    elif args.train_type == 'jr':
+        model_path = model_path + f'model_jr{args.lambda_jr}_{model_num}'
+    else:
+        model_path = model_path + f'model{model_num}'
+
     try:
         net.load_state_dict(torch.load(model_path, map_location=device))
     except:
@@ -85,7 +93,7 @@ for i in range(args.n_seeds):
              binary_search_steps=9, max_iterations=args.iters,
              clip_min=args.clip_min, clip_max=args.clip_max)
     
-    print(f'attacking model {i}')
+    print(f'attacking model {model_num}')
     test()
 
 # get adversarial test and standard accuracy
@@ -93,4 +101,4 @@ adv_ci = mean_confidence_interval(adv_test_accuracies)
 std_ci = mean_confidence_interval(test_accuracies)
 
 print(f'\nadversarial test accuracy: {adv_ci[0]:.2f} +/- {adv_ci[1]:.2f}')
-print(f'standard test accuracy: {std_ci[0]:.2f} +/- {std_ci[1]:.2f}')
+print(f'standard test accuracy: {std_ci[0]:.2f} +/- {std_ci[1]:.2f}\n\n')
