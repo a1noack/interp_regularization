@@ -27,6 +27,7 @@ class LeNet(nn.Module):
         x = self.fc2_drop(self.activation(self.fc2(x)))
         self.logits = self.fc3(x)
         self.probabilities = F.log_softmax(self.logits, dim=1)
+        
         return self.logits
     
 class DDNet(nn.Module):
@@ -59,6 +60,7 @@ class DDNet(nn.Module):
         x = self.fc2_drop(self.fc2(x))
         self.logits = self.fc3(x)
         self.probabilities = F.log_softmax(self.logits, dim=1)
+        
         return self.logits
     
 class SimpleCNN(nn.Module):
@@ -84,4 +86,5 @@ class SimpleCNN(nn.Module):
         x = self.fc1_drop(self.activation(self.fc1(x)))
         self.logits = self.fc2(x)
         self.probabilities = F.softmax(self.logits, dim=1)
+        
         return self.logits

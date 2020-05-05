@@ -1,5 +1,6 @@
 import torch
 import torchvision
+import ir_utils.target_interps_datasets as tid
 
 def cifar10(batch_size=128):
     test_transform = torchvision.transforms.Compose([
@@ -43,6 +44,30 @@ def mnist(batch_size=64):
     test_loader = torch.utils.data.DataLoader(
         torchvision.datasets.MNIST('data/MNIST', train=False, download=True,
              transform=transform),
+        batch_size=batch_size, 
+        shuffle=False
+    )
+    
+    return train_loader, test_loader
+
+def mnist_interps(batch_size=64, smoothgrad=True, thresh=1.):
+    if smoothgrad:
+        interp_type = 'smoothgrad'
+    else:
+        interp_type = 'simple_gradient'
+        
+    transform = torchvision.transforms.Compose([
+        torchvision.transforms.ToTensor()]
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), train=True, thresh=thresh), 
+        batch_size=batch_size, 
+        shuffle=True
+    )
+
+    test_loader = torch.utils.data.DataLoader(
+        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), train=False, thresh=thresh),
         batch_size=batch_size, 
         shuffle=False
     )

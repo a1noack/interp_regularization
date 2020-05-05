@@ -78,8 +78,9 @@ class Wide_ResNet(nn.Module):
         out = F.avg_pool2d(out, 8)
         out = out.view(out.size(0), -1)
         self.logits = self.linear(out)
+        self.probabilities = self.logits
 
-        return self.logits
+        return self.probabilities
 
 if __name__ == '__main__':
     net=Wide_ResNet(28, 10, 0.3, 10)
