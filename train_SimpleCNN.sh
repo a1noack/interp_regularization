@@ -1,8 +1,8 @@
 #!/bin/bash
 
-train_type=jr
-lambda_jr=.004
-lambda_ir=.004
+train_type=$2
+lambda_jr=$3
+lambda_ir=$3
 attack_type=PGD
 norm=inf
 epsilon=0.3
@@ -12,8 +12,8 @@ clip_min=0.
 clip_max=1.
 targeted=0
 
-gpu=1
-n_seeds=3
+gpu=$1
+n_seeds=1
 print_freq=1
 
 save_dir=trained_models
