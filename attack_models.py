@@ -86,7 +86,7 @@ for model_num in range(args.n_seeds):
     if args.attack_type == 'PGD':
         adversary = PGDAttack(predict=net, loss_fn=F.cross_entropy, eps=args.epsilon,
              nb_iter=args.iters, eps_iter=args.step_size, rand_init=True,
-             clip_min=args.clip_min, clip_max=args.clip_max, ord=norm, targeted=args.targeted)
+             clip_min=args.clip_min, clip_max=args.clip_max, ord=norm, targeted=False)
     elif args.attack_type == 'CW':
         adversary = CarliniWagnerL2Attack(predict=net, num_classes=args.n_classes, confidence=0,
              targeted=args.targeted, learning_rate=0.01,

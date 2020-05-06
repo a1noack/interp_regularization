@@ -10,7 +10,7 @@ import ir_utils.simple_models as simple_models
 import ir_utils.wide_resnet as wide_resnet
 from ir_utils.cmd_args import cmd_args as args
 from ir_utils.utils import train_types
-from ir_utils.loss_utils import avg_norm_jac, avg_norm_im
+from ir_utils.loss_utils import frob_norm_jac, norm_im, cos_sim, double_backprop
 import ir_utils.dataloaders as dataloaders
 
 # this function runs both training and test passes through data
@@ -20,36 +20,51 @@ def datapass(dataloader, train=True, adv_test=False):
     else:
         net.eval()
     
-    num_correct = 0
+    n_correct = 0
     total_loss = 0
+    avg_jac = 0
     for batch_idx, batch_data in enumerate(dataloader):
         if len(batch_data) == 2:
             samples, labels = [x.to(device) for x in batch_data]
         else:
             samples, labels, target_interps = [x.to(device) for x in batch_data]
             
-        if train and (args.train_type == 'at' or adv_test):
+        if (train and args.train_type == 'at') or adv_test:
             samples = adversary.perturb(samples, labels)
         
         outputs = net(samples)
             
+        # F.cross_entropy combines log softmax and nll into one function
         loss = F.cross_entropy(outputs, labels)
         
+        optimizer.zero_grad()
+        
+        # controls regularization strength
+        factor = np.sin(epoch / (args.n_epochs * (2. / np.pi)))
         if args.train_type == 'jr':
-            loss += args.lambda_jr * avg_norm_jac(net, samples, args.n_classes, args.gpu)
+            loss += args.lambda_jr * frob_norm_jac(net, samples, args.n_classes, args.gpu)
         elif args.train_type == 'ir':
-            loss += args.lambda_ir * avg_norm_im(net, samples, labels, target_interps, args.n_classes, args.gpu)
+            loss += (factor * args.lambda_ir) * norm_im(net, samples, labels, target_interps, args.n_classes, args.gpu)
+        elif args.train_type == 'cs':
+            loss += (factor * args.lambda_cs) * cos_sim(net, samples, labels, args.gpu)
+        elif args.train_type == 'db':
+            loss += (1. * args.lambda_db) * double_backprop(net, samples, labels, args.gpu)
         
         preds = torch.argmax(outputs, dim=1)
-        num_correct += torch.eq(preds, labels).sum().item()
+        n_correct += torch.eq(preds, labels).sum().item()
         total_loss += loss.item()
         
         if train:
-            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        
+        if args.track_jac:
+            avg_jac += frob_norm_jac(net, samples, args.n_classes, args.gpu, for_loss=False)
     
-    return num_correct / len(dataloader.dataset), total_loss / len(dataloader)
+    n_samples = len(dataloader.dataset)
+    n_batches = len(dataloader)
+                
+    return n_correct / n_samples, total_loss / n_batches, avg_jac / n_batches
 
 # set device
 device = torch.device(args.gpu if torch.cuda.is_available() else 'cpu')
@@ -79,6 +94,14 @@ for model_num in range(args.n_seeds):
         model_path = model_path + f'model_ir{args.lambda_ir}_{model_num}'
     elif args.train_type == 'jr':
         model_path = model_path + f'model_jr{args.lambda_jr}_{model_num}'
+    elif args.train_type == 'at':
+        model_path = model_path + f'model_pgd{norm}_eps{args.epsilon}_iters{args.iters}_{model_num}'
+    elif args.train_type == 'cs':
+        model_path = model_path + f'model_cs{args.lambda_cs}_{model_num}'
+    elif args.train_type == 'db':
+        model_path = model_path + f'model_db{args.lambda_db}_{model_num}'
+    else:
+        print(f'This is not a supported training type: {args.train_type}.')
 
     start = time.time()
     
@@ -110,14 +133,17 @@ for model_num in range(args.n_seeds):
     print(f'Saving to {model_path}')
 
     for epoch in range(1, args.n_epochs + 1):
-        train_acc, train_loss = datapass(train_loader)
+        train_acc, train_loss, norm_jac = datapass(train_loader)
         
         if epoch % args.print_freq == 0:
-            test_acc, test_loss = datapass(test_loader, train=False)
-            print(f'Epoch #{epoch}:\tTrain loss: {train_loss:.4f}\tTrain acc: {train_acc:.4f}\tTest loss: {test_loss:.4f}\tTest acc: {test_acc:.4f}')
+            test_acc, test_loss, norm_jac = datapass(test_loader, train=False)
+            print(f'Epoch #{epoch}:\tTrain loss: {train_loss:.4f}\tTrain acc: {train_acc:.4f}\tTest loss: {test_loss:.4f}\tTest acc: {test_acc:.4f}\tNorm Jac. {norm_jac:.4f}')
         lr_decayer.step()
-    torch.save(net.state_dict(), model_path)
-    adv_acc, _ = datapass(test_loader, train=False, adv_test=True)
+    try:
+        torch.save(net.state_dict(), model_path)
+    except OSError:
+        print('Error encountered when saving model.')
+    adv_acc, _, _ = datapass(test_loader, adv_test=True)
     print(f'Adv. test acc: {adv_acc:.4f}')
     print(f'Attack is {args.attack_type}-{args.iters}, l_{args.norm} norm, epsilon = {args.epsilon}, \
       \n\tstep size = {args.step_size}, iters = {args.iters}\n')
