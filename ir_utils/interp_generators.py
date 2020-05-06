@@ -3,7 +3,19 @@ import torch.distributions as tdist
 import torch.nn.functional as F
 
 def smoothgrad(net, sample, label, normalize=True, j=50, scale=1.):
-    """Creates smoothgrad saliency map. Unparallelized.
+    """Creates a SmoothGrad salience map for the given sample.
+    
+    Args:
+        net: the DNN, a torch.nn.Module instance
+        sample: a single sample
+        label: the corresponding label for sample
+        normalize: if True, normalize the magnitudes of the salience map 
+        j: the number of random samples around the given sample to consider 
+            when averaging simple gradient salience maps
+        scale: the standard deviation of the normal distribution from which we
+            select our noise to add to the original sample
+    Returns: 
+        A SmoothGrad salience map for sample and net.
     """
     sample = torch.autograd.Variable(sample.unsqueeze(0), requires_grad=True)
     
@@ -32,7 +44,17 @@ def smoothgrad(net, sample, label, normalize=True, j=50, scale=1.):
     return salience_map.squeeze(0)
 
 def simple_gradient(net, samples, labels, normalize=True, for_loss=False):
-    """Parallelized version of simple gradient salience map function.
+    """Takes a batch of samples and calculates the simple gradient salience maps for 
+    each of the samples after being passed through the net.
+    
+    Args:
+        net: the DNN, a torch.nn.Module instance
+        samples: a batch of samples
+        labels: the corresponding labels for the samples
+        normalize: if True, normalize the magnitudes of the salience maps 
+        for_loss: if True, a computation graph is built so that we can backpropagate through a gradient
+    Returns: 
+        A batch of simple gradient salience maps for the samples given.
     """
     samples = torch.autograd.Variable(samples, requires_grad=True)
     net(samples)
