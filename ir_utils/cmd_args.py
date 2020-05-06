@@ -25,8 +25,11 @@ cmd_opt.add_argument('-gpu', type=int, default=0, help='which GPU to use')
 cmd_opt.add_argument('-print_freq', type=int, default=5, help='which epochs to print training stats')
 cmd_opt.add_argument('-n_seeds', type=int, default=5, help='how many models to train with the current settings')
 
-cmd_opt.add_argument('-lambda_jr', type=float, default=4e-3, help='loss regularization weight value')
-cmd_opt.add_argument('-lambda_ir', type=float, default=4e-3, help='loss regularization weight value')
+cmd_opt.add_argument('-lambda_jr', type=float, default=4e-3, help='jacobian regularization weight value')
+cmd_opt.add_argument('-lambda_ir', type=float, default=4e-3, help='interpretation regularization weight value')
+cmd_opt.add_argument('-lambda_cs', type=float, default=4e-3, help='cosine similarity regularization weight value')
+cmd_opt.add_argument('-lambda_db', type=float, default=4e-3, help='double backpropagation regularization weight value')
+cmd_opt.add_argument('-track_jac', type=int, default=1, help='prints out norm of input output Jacobian during training')
 
 # for adversary
 cmd_opt.add_argument('-attack_type', type=str, default='PGD', help='which norm is used to bound adversary default l_inf')

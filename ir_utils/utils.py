@@ -6,8 +6,10 @@ import matplotlib.gridspec as gridspec
 
 train_types = {'st':'standard training', 
                'at':'adversarial training', 
-               'jr':'jacobian regularization', 
-               'ir': 'interpretation regularization'}
+               'jr':'Jacobian Regularization', 
+               'ir':'Interpretation Regularization',
+               'cs':'Cosine Similarity Regularization',
+               'db':'Double Backpropagation'}
 
 def mean_confidence_interval(data, confidence=0.95):
     a = 1.0 * np.array(data)
