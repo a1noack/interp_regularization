@@ -51,7 +51,8 @@ def norm_im(net, samples, labels, target_interps, device, for_loss=True):
     return interp_match_loss
 
 def cos_sim(net, samples, labels, device, for_loss=True):
-    """Regularizer based on Etmann's findings
+    """Computes losses based on (1) the size of the angle between the simple gradient interpretations
+    and their corresponding samples (2) the magnitude of the simple gradient interpretations.
     
     Args:
         net: the DNN, a torch.nn.Module instance
@@ -70,11 +71,13 @@ def cos_sim(net, samples, labels, device, for_loss=True):
     cos_sim = F.cosine_similarity(samples.flatten(start_dim=1, end_dim=-1), 
                                   interps.flatten(start_dim=1, end_dim=-1))
     cos_sim_loss = -torch.mean(cos_sim)
-    
-    return cos_sim_loss
+    grad_mag_loss = torch.norm(interps, p='fro')
+        
+    return cos_sim_loss, grad_mag_loss
 
 def double_backprop(net, samples, labels, device, loss_fn=F.cross_entropy, for_loss=True):
-    """Drucker and LeCun's 'Double Backpropagation', Ross and Doshi-Velez's 'Input Gradient Regularization'
+    """Drucker and LeCun's 'Double Backpropagation', 
+    Ross and Doshi-Velez's 'Input Gradient Regularization'
     
     Args:
         net: the DNN, a torch.nn.Module instance
