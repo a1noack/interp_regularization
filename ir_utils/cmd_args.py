@@ -22,7 +22,7 @@ cmd_opt.add_argument('-momentum', type=float, default=.9, help='momentum for SGD
 cmd_opt.add_argument('-nesterov', type=bool, default=True, help='whether nesterov momentum is used with SGD')
 
 cmd_opt.add_argument('-gpu', type=int, default=0, help='which GPU to use')
-cmd_opt.add_argument('-print_freq', type=int, default=5, help='which epochs to print training stats')
+cmd_opt.add_argument('-update_freq', type=int, default=5, help='which epochs to consider printing training stats and saving model')
 cmd_opt.add_argument('-seed', type=int, default=42, help='current seed')
 
 cmd_opt.add_argument('-lambda_jr', type=float, default=0, help='jacobian regularization weight value')
@@ -41,5 +41,6 @@ cmd_opt.add_argument('-iters', type=int, default=7, help='attack iterations')
 cmd_opt.add_argument('-clip_min', type=float, default=0., help='minimum value pixel can have')
 cmd_opt.add_argument('-clip_max', type=float, default=1., help='maximum value pixel can have')
 cmd_opt.add_argument('-targeted', type=int, default=0, help='1 => target, 0 => untargeted')
+cmd_opt.add_argument('-n_attack', type=int, default=1, help='the number of times to attack all test set samples with each model')
 
 cmd_args, _ = cmd_opt.parse_known_args()

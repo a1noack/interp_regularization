@@ -36,17 +36,17 @@ def get_path(args, dir_path=False):
     if dir_path:
         return model_path
     if args.train_type == 'st':
-        model_path = model_path + f'model_{args.seed}'
+        model_path = model_path + f'model_{args.seed}.pt'
     elif args.train_type == 'ir':
-        model_path = model_path + f'model_ir{args.lambda_ir}_{args.seed}'
+        model_path = model_path + f'model_ir{args.lambda_ir}_{args.seed}.pt'
     elif args.train_type == 'jr':
-        model_path = model_path + f'model_jr{args.lambda_jr}_{args.seed}'
+        model_path = model_path + f'model_jr{args.lambda_jr}_{args.seed}.pt'
     elif args.train_type == 'at':
-        model_path = model_path + f'model_pgd{args.norm}_eps{args.epsilon}_iters{args.iters}_{args.seed}'
+        model_path = model_path + f'model_pgd{args.norm}_eps{args.epsilon}_iters{args.iters}_{args.seed}.pt'
     elif args.train_type == 'cs':
-        model_path = model_path + f'model_cs{args.lambda_cs}_gm{args.lambda_gm}_{args.seed}'
+        model_path = model_path + f'model_cs{args.lambda_cs}_gm{args.lambda_gm}_{args.seed}.pt'
     elif args.train_type == 'db':
-        model_path = model_path + f'model_db{args.lambda_db}_{args.seed}'
+        model_path = model_path + f'model_db{args.lambda_db}_{args.seed}.pt'
     else:
         print(f'This is not a supported training type: {args.train_type}.')
         
