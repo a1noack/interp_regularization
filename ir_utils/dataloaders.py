@@ -2,7 +2,7 @@ import torch
 import torchvision
 import ir_utils.target_interps_datasets as tid
 
-def cifar10(batch_size=128):
+def cifar10(batch_size=128, augment=True):
     test_transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor(),
     ])
@@ -12,6 +12,8 @@ def cifar10(batch_size=128):
         torchvision.transforms.RandomCrop(32, 4),
         torchvision.transforms.ToTensor(),
     ])
+    if not augment:
+        train_transform = test_transform
 
     train_loader = torch.utils.data.DataLoader(
         torchvision.datasets.CIFAR10('data/CIFAR-10', train=True, download=True,
@@ -68,6 +70,21 @@ def mnist_interps(batch_size=64, smoothgrad=True, thresh=1.):
 
     test_loader = torch.utils.data.DataLoader(
         tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), train=False, thresh=thresh),
+        batch_size=batch_size, 
+        shuffle=False
+    )
+    
+    return train_loader, test_loader
+
+def cifar10_interps(batch_size=128, augment=True, thresh=1.):
+    train_loader = torch.utils.data.DataLoader(
+        tid.CIFAR10Interps('data/CIFAR-10/pgdL2_eps1.2549_iters7_smoothgrad/', augment=augment, thresh=thresh), 
+        batch_size=batch_size, 
+        shuffle=True
+    )
+
+    test_loader = torch.utils.data.DataLoader(
+        tid.CIFAR10Interps('data/CIFAR-10/pgdL2_eps1.2549_iters7_smoothgrad/', augment=False, thresh=thresh),
         batch_size=batch_size, 
         shuffle=False
     )
