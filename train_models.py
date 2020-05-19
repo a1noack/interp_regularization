@@ -9,9 +9,10 @@ import ir_utils.resnet as resnet
 import ir_utils.simple_models as simple_models
 import ir_utils.wide_resnet as wide_resnet
 from ir_utils.cmd_args import cmd_args as args
-from ir_utils.utils import train_types, get_model_path, instantiate_model
-from ir_utils.loss_utils import frob_norm_jac, norm_im, cos_sim, double_backprop
+from ir_utils.utils import train_types, get_path, instantiate_model
+from ir_utils.loss_utils import frob_norm_jac, norm_im, cos_sim_img, double_backprop
 import ir_utils.dataloaders as dataloaders
+from jacobian import JacobianReg
 
 # this function runs both training and test passes through data
 def datapass(dataloader, train=True, adv_test=False):
@@ -23,6 +24,7 @@ def datapass(dataloader, train=True, adv_test=False):
     n_correct = 0
     total_loss = 0
     avg_jac = 0
+#     start_time = time.time()
     for batch_idx, batch_data in enumerate(dataloader):
         if len(batch_data) == 2:
             samples, labels = [x.to(device) for x in batch_data]
@@ -31,27 +33,32 @@ def datapass(dataloader, train=True, adv_test=False):
             
         if (train and args.train_type == 'at') or adv_test:
             samples = adversary.perturb(samples, labels)
+            
+        if args.train_type in ['jr', 'ir', 'db', 'cs']:
+            samples.requires_grad = True
         
-        outputs = net(samples)
+        logits = net(samples)
             
         # F.cross_entropy combines log softmax and nll into one function
-        loss = F.cross_entropy(outputs, labels)
+        loss = F.cross_entropy(logits, labels)
         
         optimizer.zero_grad()
         
-        # controls regularization strength
-        factor = np.sin(epoch / (args.n_epochs * (2. / np.pi)))
-        if args.train_type == 'jr':
-            loss += args.lambda_jr * frob_norm_jac(net, samples, args.n_classes, args.gpu)
-        elif args.train_type == 'ir':
-            loss += (factor * args.lambda_ir) * norm_im(net, samples, labels, target_interps, args.n_classes, args.gpu)
-        elif args.train_type == 'cs':
-            cs_loss, gm_loss = cos_sim(net, samples, labels, args.gpu)
-            loss += factor * ((args.lambda_cs * cs_loss) + (args.lambda_gm * gm_loss))
-        elif args.train_type == 'db':
-            loss += (1. * args.lambda_db) * double_backprop(net, samples, labels, args.gpu)
+        if train:
+            # controls regularization strength
+            factor = np.sin(epoch / (args.n_epochs * (2. / np.pi)))
+            if args.train_type == 'jr':
+#                 loss += args.lambda_jr * frob_norm_jac(net, samples, args.n_classes)
+                loss += args.lambda_jr * jreg(samples, logits)
+            elif args.train_type == 'ir':
+                loss += (factor * args.lambda_ir) * norm_im(samples, logits, labels, target_interps)
+            elif args.train_type == 'cs':
+                cs_loss, gm_loss = cos_sim_img(net, samples, labels)
+                loss += factor * ((args.lambda_cs * cs_loss) + (args.lambda_gm * gm_loss))
+            elif args.train_type == 'db':
+                loss += (1. * args.lambda_db) * double_backprop(loss, samples)
         
-        preds = torch.argmax(outputs, dim=1)
+        preds = torch.argmax(logits, dim=1)
         n_correct += torch.eq(preds, labels).sum().item()
         total_loss += loss.item()
         
@@ -61,8 +68,10 @@ def datapass(dataloader, train=True, adv_test=False):
         
         if args.track_jac:
             # When performing this calculation for CIFAR-10, 128*10 examples need to be created. This is too much.
-            # So, just take the first 20 examples and use them to calculate the Jacobian
-            avg_jac += frob_norm_jac(net, samples[:20], args.n_classes, args.gpu, for_loss=False)
+            # So, just take the first n_track examples and use them to calculate the Jacobian
+            n_track = 20
+            avg_jac += frob_norm_jac(net, samples[:n_track], args.n_classes, args.gpu, for_loss=False) / n_track
+#     print(f'one epoch runtime: {time.time() - start_time}')
     
     n_samples = len(dataloader.dataset)
     n_batches = len(dataloader)
@@ -78,17 +87,25 @@ if __name__ == '__main__':
 
     # get dataloaders
     if args.dataset == 'CIFAR-10':
-        train_loader, test_loader = dataloaders.cifar10()
+        if args.train_type == 'ir':
+            train_loader, test_loader = dataloaders.cifar10_interps(
+                batch_size=args.batch_size, thresh=1., augment=True
+            )
+        else:
+            train_loader, test_loader = dataloaders.cifar10(batch_size=args.batch_size)
     elif args.dataset == 'MNIST':
         if args.train_type == 'ir':
-            train_loader, test_loader = dataloaders.mnist_interps(smoothgrad=False)
+            train_loader, test_loader = dataloaders.mnist_interps(batch_size=args.batch_size, smoothgrad=False)
         else:
-            train_loader, test_loader = dataloaders.mnist()
+            train_loader, test_loader = dataloaders.mnist(batch_size=args.batch_size)
 
     if args.norm == 'inf':
         norm = np.inf
     elif args.norm == '2':
         norm = 2
+        
+    if args.train_type == 'jr':
+        jreg = JacobianReg()
 
     print(f'Training {args.model_name} model with {train_types[args.train_type]}.\n')
 
@@ -96,7 +113,7 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)  
     
     # construct file path to save location and instantiate model
-    model_path = get_model_path(args)
+    model_path = get_path(args)
     
     # instantiate model, adversary, optimizer
     net = instantiate_model(args)
@@ -117,20 +134,29 @@ if __name__ == '__main__':
     print(f'TRAINING MODEL {args.seed}')
     print(f'Saving to {model_path}')
     start = time.time()
+    best_acc = 0
     for epoch in range(1, args.n_epochs + 1):
         train_acc, train_loss, norm_jac = datapass(train_loader)
 
-        if epoch % args.print_freq == 0:
+        if epoch % args.update_freq == 0:
             test_acc, test_loss, norm_jac = datapass(test_loader, train=False)
             print(f'Epoch #{epoch}:\tTrain loss: {train_loss:.4f}\tTrain acc: {train_acc:.4f}\tTest loss: {test_loss:.4f}\tTest acc: {test_acc:.4f}\tNorm Jac. {norm_jac:.4f}')
+            
+            if test_acc > best_acc:
+                best_acc = test_acc
+                print('\tSaving model state dict.')
+                tries = 0
+                while tries < 5:
+                    try:
+                        torch.save(net.state_dict(), model_path)
+                        print('\tSave successful.')
+                        tries = 5
+                    except OSError:
+                        tries += 1
+                        print(f'\tError encountered when saving model. Try {tries}/5')
+                
         lr_decayer.step()
     print(f'\nTotal train time: {(time.time()-start)/60:.1f} minutes\n\n')
-
-    # save final model
-    try:
-        torch.save(net.state_dict(), model_path)
-    except OSError:
-        print('Error encountered when saving model.')
 
     # get final test and adversarial accuracy
     adv_acc, _, _ = datapass(test_loader, adv_test=True)
