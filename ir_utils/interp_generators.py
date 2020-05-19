@@ -2,7 +2,7 @@ import torch
 import torch.distributions as tdist
 import torch.nn.functional as F
 
-def smoothgrad(net, sample, label, normalize=True, j=50, scale=1.):
+def smoothgrad(net, sample, label, normalize=True, j=50, scale=1., rgb=True):
     """Creates a SmoothGrad salience map for the given sample.
     
     Args:
@@ -14,10 +14,13 @@ def smoothgrad(net, sample, label, normalize=True, j=50, scale=1.):
             when averaging simple gradient salience maps
         scale: the standard deviation of the normal distribution from which we
             select our noise to add to the original sample
+        rgb: True if the salience map should have three channels. False => aggregate
+            across the three channels to produce one channel.
     Returns: 
         A SmoothGrad salience map for sample and net.
     """
-    sample = torch.autograd.Variable(sample.unsqueeze(0), requires_grad=True)
+# #     sample = torch.autograd.Variable(sample.unsqueeze(0), requires_grad=True)
+#     sample.requires_grad = True
     
     # add random noise to original sample
     normal = tdist.Normal(loc=torch.tensor([0.]), scale=torch.tensor([scale]))
@@ -26,6 +29,7 @@ def smoothgrad(net, sample, label, normalize=True, j=50, scale=1.):
     noise = normal.sample(shape).reshape(shape)
     samples = torch.clamp(sample + noise, 0., 1.) # ensure pixels in [0,1] range
     samples = torch.cat([samples, sample], dim=0)
+    samples.requires_grad = True
     
     # get salience maps
     net(samples)
@@ -35,15 +39,15 @@ def smoothgrad(net, sample, label, normalize=True, j=50, scale=1.):
     salience_maps = torch.abs(grads)
     
     # aggregate across salience maps and within aggregated map
-    salience_map = salience_maps.mean(dim=0, keepdims=True)
-    if salience_map.shape[1] == 3:
+    salience_map = salience_maps.mean(dim=0, keepdim=True)
+    if salience_map.shape[1] == 3 and not rgb:
         salience_map = torch.mean(salience_map, dim=1, keepdim=True)
     if normalize:
         salience_map = salience_map/torch.sum(salience_map)
         
     return salience_map.squeeze(0)
 
-def simple_gradient(net, samples, labels, normalize=True, for_loss=False):
+def simple_gradient(net, samples, labels, normalize=True, for_loss=False, rgb=True):
     """Takes a batch of samples and calculates the simple gradient salience maps for 
     each of the samples after being passed through the net.
     
@@ -53,6 +57,8 @@ def simple_gradient(net, samples, labels, normalize=True, for_loss=False):
         labels: the corresponding labels for the samples
         normalize: if True, normalize the magnitudes of the salience maps 
         for_loss: if True, a computation graph is built so that we can backpropagate through a gradient
+        rgb: True if the salience map should have three channels. False => aggregate
+            across the three channels to produce one channel.
     Returns: 
         A batch of simple gradient salience maps for the samples given.
     """
@@ -64,7 +70,7 @@ def simple_gradient(net, samples, labels, normalize=True, for_loss=False):
     
     salience_maps = torch.abs(grads)
     
-    if salience_maps.shape[1] == 3:
+    if salience_maps.shape[1] == 3 and not rgb:
         salience_maps = torch.mean(salience_maps, dim=1, keepdim=True)
 
     if normalize:

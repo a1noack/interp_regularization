@@ -87,7 +87,7 @@ def threshold(a, scale):
     
     return a 
 
-def display(img, size=3):
+def display(img, size=3, cmap='gist_heat'):
     """Displays image with dimensions (c,h,w)"""
     img = img.squeeze()
     if img.shape[0] == 3:
@@ -96,7 +96,7 @@ def display(img, size=3):
     spec = gridspec.GridSpec(ncols=1, nrows=1, figure=fig)
 
     ax1 = fig.add_subplot(spec[0,0])
-    im1 = ax1.imshow(img.squeeze().numpy(), cmap='gist_heat')
+    im1 = ax1.imshow(img.squeeze().numpy(), cmap=cmap)
     plt.axis('on')
     
     plt.show()
