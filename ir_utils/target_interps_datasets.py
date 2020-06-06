@@ -1,5 +1,6 @@
 from torchvision.datasets.vision import VisionDataset
 import torchvision.transforms.functional as TF
+import torch.nn.functional as F
 import torchvision
 import random
 import os
@@ -7,23 +8,43 @@ import os.path
 import torch
 from PIL import Image
 
+def variable_permute(target_interps, perm_percent):
+    """Permutes perm_percent of the indices in target_interps."""
+    n_elements = target_interps[0].nelement()
+    n_perm = int(n_elements * perm_percent)
+    shape = target_interps[0].shape
+
+    for i in range(len(target_interps)):
+        target_interp_i = target_interps[i].view(-1)
+        idxs_to_perm = torch.randperm(n_elements)[:n_perm]
+        values = target_interp_i[idxs_to_perm]
+
+        permed_values = values[torch.randperm(n_perm)]
+
+        target_interp_i[idxs_to_perm] = permed_values
+
+        target_interps[i] = target_interp_i.reshape(shape)
+
 class MNISTInterps(VisionDataset):
     classes = ['0 - zero', '1 - one', '2 - two', '3 - three', '4 - four',
                '5 - five', '6 - six', '7 - seven', '8 - eight', '9 - nine']
 
     def __init__(self, root, train=True, transform=None, target_transform=None, 
-                 interp_transform=None, thresh=None, permute=False):
+                 interp_transform=None, thresh=None, permute_percent=0.):
         super(MNISTInterps, self).__init__(root, transform=transform, target_transform=target_transform)
         self.train = train  # training set or test set
         self.interp_transform = interp_transform
         self.thresh = thresh
-        self.permute = permute
+        self.permute_percent = permute_percent
 
         if self.train:
             data_file = 'training.pt'
         else:
             data_file = 'test.pt'
         self.data, self.targets, self.target_interps = torch.load(os.path.join(root, data_file))
+        
+        if permute_percent > 0:
+            variable_permute(self.target_interps, permute_percent)
 
     def __getitem__(self, index):
         """
@@ -64,11 +85,11 @@ class CIFAR10Interps(VisionDataset):
     classes = ['0 - airplance', '1 - automobile', '2 - bird', '3 - cat', '4 - deer', 
                '5 - dog', '6 - frog', '7 - horse', '8 - ship', '9 - truck']
 
-    def __init__(self, root, train=True, augment=False, thresh=None, permute=False):
+    def __init__(self, root, train=True, augment=False, thresh=None, permute_percent=0.):
         super(CIFAR10Interps, self).__init__(root, transform=None, target_transform=None)
         self.train = train  # training set or test set
         self.thresh = thresh
-        self.permute = permute
+        self.permute_percent = permute_percent
         self.augment = augment
 
         if self.train:
@@ -89,30 +110,30 @@ class CIFAR10Interps(VisionDataset):
         self.data = torch.cat(data, dim=0)
         self.targets = torch.cat(targets, dim=0)
         self.target_interps = torch.cat(target_interps, dim=0)
+        
+        if self.train:
+            train_type = 'training'
+        else:
+            train_type = 'test'
+            
+        print(f'Target interps threshold: {thresh}')
+        print(f'Permute percent for {train_type} set target interps: {permute_percent*100:.2f}%')
+        if permute_percent > 0:
+            variable_permute(self.target_interps, permute_percent)
     
     def joint_transform(self, img, target_interp):
-        # convert to PIL image for transforms
-        img = TF.to_pil_image(img)
-        target_interp = TF.to_pil_image(target_interp)
+        img = F.pad(img, (4, 4, 4, 4), 'constant', 0)
+        target_interp = F.pad(target_interp, (4, 4, 4, 4), 'constant', 0)
         
-        # pad before cropping
-        img = TF.pad(img, 4, fill=0)
-        target_interp = TF.pad(target_interp, 4, fill=0)
+        i, j, h, w = torchvision.transforms.RandomCrop.get_params(img, output_size=(32, 32))
+        # this is assuming that the image and target interps are in CxHxW format
+        img = img[:, i:i+h, j:j+w] 
+        target_interp = target_interp[:, i:i+h, j:j+w]
         
-        # random crop img and target_interp identically
-        i, j, h, w = torchvision.transforms.RandomCrop.get_params(
-            img, output_size=(32, 32))
-        img = TF.crop(img, i, j, h, w)
-        target_interp = TF.crop(target_interp, i, j, h, w)
-
-        # random horizontal flipping
         if random.random() > 0.5:
-            img = TF.hflip(img)
-            target_interp = TF.hflip(target_interp)
-
-        # transform to tensor
-        img = TF.to_tensor(img)
-        target_interp = TF.to_tensor(target_interp)
+            # images in CxHxW format, so to do horizontal flip, flip along width dimension, i.e. dim=2
+            img = torch.flip(img, dims=[2]) 
+            target_interp = torch.flip(target_interp, dims=[2])
         
         return img, target_interp
 
@@ -134,10 +155,6 @@ class CIFAR10Interps(VisionDataset):
             std = target_interp.std()
             mean = target_interp.mean()
             target_interp = torch.where(target_interp > mean + self.thresh * std, target_interp, torch.tensor([0.]).cpu())
-        
-        if self.permute:
-            idx = torch.randperm(target_interp.nelement())
-            target_interp = target_interp.view(-1)[idx].view(target_interp.shape)
 
         return img, target, target_interp
 
