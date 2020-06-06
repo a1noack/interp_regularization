@@ -46,7 +46,7 @@ def norm_im(samples, logits, labels, target_interps, for_loss=True):
     
     return interp_match_loss
 
-def cos_sim_img(samples, logits, labels, target_interps=None, for_loss=True):
+def cos_sim(samples, logits, labels, target_interps, for_loss=True, abs=False):
     """Computes losses based on (1) the size of the angle between the simple gradient interpretations
     and their corresponding samples (2) the magnitude of the simple gradient interpretations.
     
@@ -61,15 +61,17 @@ def cos_sim_img(samples, logits, labels, target_interps=None, for_loss=True):
         cos_sim_loss: the average of the cosine similarity measures calculated between 
             the simple gradient salience maps and the samples
     """
-    if target_interps == None:
-        target_interps = samples
     grad_outputs = F.one_hot(labels, num_classes=10).float()
     grads = torch.autograd.grad(logits, samples, grad_outputs=grad_outputs, create_graph=for_loss)[0]
-    interps = torch.abs(grads)
+    if abs:
+        interps = torch.abs(grads)
+    else:
+        interps = grads
     cos_sim = F.cosine_similarity(target_interps.flatten(start_dim=1, end_dim=-1), 
                                   interps.flatten(start_dim=1, end_dim=-1))
-    cos_sim_loss = -torch.mean(cos_sim)
-    grad_mag_loss = torch.norm(interps, p='fro')
+    cos_sim_loss = 1 - torch.mean(cos_sim)
+    # Jacubovitz et al. find norm of entire minibatch.
+    grad_mag_loss = torch.norm(interps, p='fro') 
         
     return cos_sim_loss, grad_mag_loss
 

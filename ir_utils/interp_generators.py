@@ -2,7 +2,7 @@ import torch
 import torch.distributions as tdist
 import torch.nn.functional as F
 
-def smoothgrad(net, sample, label, normalize=True, j=50, scale=1., rgb=True):
+def smoothgrad(net, sample, label, normalize=True, j=50, scale=1., rgb=True, abs=True):
     """Creates a SmoothGrad salience map for the given sample.
     
     Args:
@@ -36,7 +36,11 @@ def smoothgrad(net, sample, label, normalize=True, j=50, scale=1., rgb=True):
     logits = net.logits
     grad_outputs = F.one_hot(label.repeat(j+1,1), num_classes=logits.shape[1]).float().squeeze()
     grads = torch.autograd.grad(logits, samples, grad_outputs=grad_outputs)[0].squeeze()
-    salience_maps = torch.abs(grads)
+    
+    if abs:
+        salience_maps = torch.abs(grads)
+    else:
+        salience_maps = grads
     
     # aggregate across salience maps and within aggregated map
     salience_map = salience_maps.mean(dim=0, keepdim=True)
@@ -47,7 +51,7 @@ def smoothgrad(net, sample, label, normalize=True, j=50, scale=1., rgb=True):
         
     return salience_map.squeeze(0)
 
-def simple_gradient(net, samples, labels, normalize=True, for_loss=False, rgb=True):
+def simple_gradient(net, samples, labels, normalize=True, for_loss=False, rgb=True, abs=True):
     """Takes a batch of samples and calculates the simple gradient salience maps for 
     each of the samples after being passed through the net.
     
@@ -68,7 +72,10 @@ def simple_gradient(net, samples, labels, normalize=True, for_loss=False, rgb=Tr
     grad_outputs = F.one_hot(labels, num_classes=10).float()
     grads = torch.autograd.grad(net.logits, samples, grad_outputs=grad_outputs, create_graph=for_loss)[0]
     
-    salience_maps = torch.abs(grads)
+    if abs:
+        salience_maps = torch.abs(grads)
+    else:
+        salience_maps = grads
     
     if salience_maps.shape[1] == 3 and not rgb:
         salience_maps = torch.mean(salience_maps, dim=1, keepdim=True)
