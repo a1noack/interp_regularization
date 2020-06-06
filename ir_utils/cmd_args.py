@@ -31,6 +31,8 @@ cmd_opt.add_argument('-lambda_cs', type=float, default=0, help='cosine similarit
 cmd_opt.add_argument('-lambda_gm', type=float, default=0, help='simple gradient regularization weight value')
 cmd_opt.add_argument('-lambda_db', type=float, default=0, help='double backpropagation regularization weight value')
 cmd_opt.add_argument('-track_jac', type=int, default=1, help='prints out norm of input output Jacobian during training')
+cmd_opt.add_argument('-permute_percent', type=float, default=0., help='the percentage of values in each target interpretation to switch around')
+cmd_opt.add_argument('-interps_version', type=int, default=0, help='controls how and from where the target interps were generated')
 
 # for adversary
 cmd_opt.add_argument('-attack_type', type=str, default='PGD', help='which norm is used to bound adversary default l_inf')
@@ -42,5 +44,7 @@ cmd_opt.add_argument('-clip_min', type=float, default=0., help='minimum value pi
 cmd_opt.add_argument('-clip_max', type=float, default=1., help='maximum value pixel can have')
 cmd_opt.add_argument('-targeted', type=int, default=0, help='1 => target, 0 => untargeted')
 cmd_opt.add_argument('-n_attack', type=int, default=1, help='the number of times to attack all test set samples with each model')
+
+cmd_opt.add_argument('-attack_name', type=str, default='L2_weak')
 
 cmd_args, _ = cmd_opt.parse_known_args()
