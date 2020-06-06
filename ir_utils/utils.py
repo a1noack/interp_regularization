@@ -8,6 +8,52 @@ from ir_utils.cmd_args import cmd_args as args
 import ir_utils.simple_models as simple_models
 import ir_utils.wide_resnet as wide_resnet
 
+MNIST_ATTACKERS = {
+    'L2_weak': {"eps":1.5, 
+                "nb_iter":40,
+                "eps_iter":.50,
+                "ord":2},
+    'L2_strong': {"eps":2.5, 
+                "nb_iter":40,
+                "eps_iter":1.2,
+                "ord":2},
+    'L2_vstrong': {"eps":3.5, 
+                "nb_iter":40,
+                "eps_iter":1.75,
+                "ord":2},
+    'Linf_weak': {"eps":.1, 
+                "nb_iter":40,
+                "eps_iter":(2.5*.1)/40,
+                "ord":np.inf},
+    'Linf_strong': {"eps":.2, 
+                "nb_iter":40,
+                "eps_iter":(2.5*.2)/40,
+                "ord":np.inf},
+}
+
+CIFAR10_ATTACKERS = {
+    'L2_weak': {"eps":80/255., 
+                "nb_iter":40,
+                "eps_iter":.04,
+                "ord":2},
+    'L2_strong': {"eps":320/255., 
+                "nb_iter":40,
+                "eps_iter":.16,
+                "ord":2},
+    'Linf_weak': {"eps":4/255., 
+                "nb_iter":40,
+                "eps_iter":1/255.,
+                "ord":np.inf},
+    'Linf_strong': {"eps":8/255., 
+                "nb_iter":40,
+                "eps_iter":2/255.,
+                "ord":np.inf},
+    'L2_weak_train': {"eps":80/255., 
+                "nb_iter":7,
+                "eps_iter":.1,
+                "ord":2},
+}
+
 train_types = {'st':'standard training', 
                'at':'adversarial training', 
                'jr':'Jacobian Regularization', 
@@ -31,7 +77,7 @@ def scrape_dir(dir_path):
             
     return partitioned_files
 
-def get_path(args, dir_path=False):
+def get_path(args, attack_configs=None, dir_path=False):
     model_path = f'{args.save_dir}/{args.dataset}/{args.model_name}_{args.train_type}/'
     if dir_path:
         return model_path
@@ -42,9 +88,12 @@ def get_path(args, dir_path=False):
     elif args.train_type == 'jr':
         model_path = model_path + f'model_jr{args.lambda_jr}_{args.seed}.pt'
     elif args.train_type == 'at':
-        model_path = model_path + f'model_pgd{args.norm}_eps{args.epsilon}_iters{args.iters}_{args.seed}.pt'
+        ord = attack_configs['ord']
+        eps = attack_configs['eps']
+        nb_iter = attack_configs['nb_iter']
+        model_path = model_path + f'model_pgd{ord}_eps{eps}_iters{nb_iter}_{args.seed}.pt'
     elif args.train_type == 'cs':
-        model_path = model_path + f'model_cs{args.lambda_cs}_gm{args.lambda_gm}_{args.seed}.pt'
+        model_path = model_path + f'model_cs{args.lambda_cs}_gm{args.lambda_gm}_pp{args.permute_percent}_{args.seed}.pt'
     elif args.train_type == 'db':
         model_path = model_path + f'model_db{args.lambda_db}_{args.seed}.pt'
     else:
