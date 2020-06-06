@@ -52,41 +52,61 @@ def mnist(batch_size=64):
     
     return train_loader, test_loader
 
-def mnist_interps(batch_size=64, smoothgrad=True, thresh=1.):
-    if smoothgrad:
+def mnist_interps(batch_size=64, thresh=1., permute_percent=0., version=0):
+    if version == 0:
         interp_type = 'smoothgrad'
-    else:
+    elif version == 1:
         interp_type = 'simple_gradient'
+    print(f'Using target interps generated using {interp_type}')
         
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor()]
     )
 
     train_loader = torch.utils.data.DataLoader(
-        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), train=True, thresh=thresh), 
+        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), 
+                         train=True, 
+                         thresh=thresh,
+                         permute_percent=permute_percent), 
         batch_size=batch_size, 
         shuffle=True
     )
 
     test_loader = torch.utils.data.DataLoader(
-        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), train=False, thresh=thresh),
+        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), 
+                         train=False, 
+                         thresh=thresh, 
+                         permute_percent=permute_percent),
         batch_size=batch_size, 
         shuffle=False
     )
     
     return train_loader, test_loader
 
-def cifar10_interps(batch_size=128, augment=True, thresh=1.):
+def cifar10_interps(batch_size=128, augment=True, thresh=1., permute_percent=0., version=0):
+    if version == 0:
+        data_path = 'data/CIFAR-10/pgdL2_eps1.2549_iters7_smoothgrad/'
+    elif version == 1:
+        data_path = 'data/CIFAR-10/pgdL2_eps0.314_iters7_simp_unproc'
+    elif version == 2:
+        data_path = 'data/CIFAR-10/pgdL2_eps0.314_iters7_smooth_unproc'
+    print('Getting target interps dataset from:', data_path)
+        
     train_loader = torch.utils.data.DataLoader(
-        tid.CIFAR10Interps('data/CIFAR-10/pgdL2_eps1.2549_iters7_smoothgrad/', augment=augment, thresh=thresh), 
+        tid.CIFAR10Interps(data_path, train=True, 
+                           augment=augment, thresh=thresh, 
+                           permute_percent=permute_percent), 
         batch_size=batch_size, 
         shuffle=True
     )
 
     test_loader = torch.utils.data.DataLoader(
-        tid.CIFAR10Interps('data/CIFAR-10/pgdL2_eps1.2549_iters7_smoothgrad/', augment=False, thresh=thresh),
+        tid.CIFAR10Interps(data_path, train=False, 
+                           augment=False, thresh=thresh, 
+                           permute_percent=permute_percent),
         batch_size=batch_size, 
-        shuffle=False
+        shuffle=False,
+        
     )
     
     return train_loader, test_loader
