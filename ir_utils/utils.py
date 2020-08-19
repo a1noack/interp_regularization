@@ -29,6 +29,14 @@ MNIST_ATTACKERS = {
                 "nb_iter":40,
                 "eps_iter":(2.5*.2)/40,
                 "ord":np.inf},
+    'Linf_vstrong': {"eps":.25, 
+                "nb_iter":40,
+                "eps_iter":(2.5*.25)/40,
+                "ord":np.inf},
+    'Linf_vvstrong': {"eps":.3, 
+                "nb_iter":40,
+                "eps_iter":(2.5*.3)/40,
+                "ord":np.inf}
 }
 
 CIFAR10_ATTACKERS = {
@@ -61,6 +69,28 @@ train_types = {'st':'standard training',
                'cs':'Cosine Similarity Regularization',
                'db':'Double Backpropagation'}
 
+def permute(target_interp, perm_percent):
+    """Permutes perm_percent of the indices in target_interp.
+    
+    Args:
+        target_interp (torch.Tensor): a single interpretation to be permuted. 
+        perm_percent (float): value between zero and one that represents the probability that any of the
+            any one of the C*H*W pixel values in the target interp will be swapped for another.
+    """
+    n_elements = target_interp.nelement()
+    n_perm = int(n_elements * perm_percent)
+    shape = target_interp.shape
+
+    target_interp = target_interp.view(-1)
+    idxs_to_perm = torch.randperm(n_elements)[:n_perm]
+    values = target_interp[idxs_to_perm]
+
+    permed_values = values[torch.randperm(n_perm)]
+
+    target_interp[idxs_to_perm] = permed_values
+
+    return target_interp.reshape(shape)
+
 def scrape_dir(dir_path):
     """Returns a dictionary of all of the pytorch models contained in 
     the directory at dir_path, where the values
@@ -76,6 +106,9 @@ def scrape_dir(dir_path):
             partitioned_files[seedless_name] = [model_file]
             
     return partitioned_files
+
+def zero_one_scale(a):
+    return (a - a.min()) / (a.max() - a.min())
 
 def get_path(args, attack_configs=None, dir_path=False):
     model_path = f'{args.save_dir}/{args.dataset}/{args.model_name}_{args.train_type}/'
@@ -93,7 +126,7 @@ def get_path(args, attack_configs=None, dir_path=False):
         nb_iter = attack_configs['nb_iter']
         model_path = model_path + f'model_pgd{ord}_eps{eps}_iters{nb_iter}_{args.seed}.pt'
     elif args.train_type == 'cs':
-        model_path = model_path + f'model_cs{args.lambda_cs}_gm{args.lambda_gm}_pp{args.permute_percent}_{args.seed}.pt'
+        model_path = model_path + f'model_cs{args.lambda_cs}_gm{args.lambda_gm}_pp{args.permute_percent}_v{args.interps_version}_{args.seed}.pt'
     elif args.train_type == 'db':
         model_path = model_path + f'model_db{args.lambda_db}_{args.seed}.pt'
     else:
@@ -128,12 +161,17 @@ def mean_confidence_interval(data, confidence=0.95):
             h = np.inf
     return m, h
 
-def threshold(a, scale):
+def threshold(a, scale, abs=False):
     """Used to threshold a tensor."""
     std = a.std()
     mean = a.mean()
-    a = torch.where(a > mean + scale * std, a, torch.tensor([0.]))
-    
+    top = torch.where(a > mean + scale * std, a, torch.tensor([0.]))
+    if abs:
+        a = top
+    else:
+        btm = torch.where(a < mean - scale * std, a, torch.tensor([0.]))
+        a = top + btm
+        
     return a 
 
 def display(img, size=3, cmap='gist_heat'):
@@ -149,3 +187,10 @@ def display(img, size=3, cmap='gist_heat'):
     plt.axis('on')
     
     plt.show()
+    
+def show(img, size=16):
+    npimg = img.numpy()
+    plt.figure(figsize = (size,size))
+    plt.axis('off')
+    plt.rcParams["axes.grid"] = False
+    plt.imshow(np.transpose(npimg, (1,2,0)), interpolation='nearest')

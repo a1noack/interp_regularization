@@ -26,6 +26,7 @@ cmd_opt.add_argument('-update_freq', type=int, default=5, help='which epochs to 
 cmd_opt.add_argument('-seed', type=int, default=42, help='current seed')
 
 cmd_opt.add_argument('-lambda_jr', type=float, default=0, help='jacobian regularization weight value')
+cmd_opt.add_argument('-jr_approx', type=int, default=1, help='use approximation of jacobian with random projections')
 cmd_opt.add_argument('-lambda_ir', type=float, default=0, help='interpretation regularization weight value')
 cmd_opt.add_argument('-lambda_cs', type=float, default=0, help='cosine similarity regularization weight value')
 cmd_opt.add_argument('-lambda_gm', type=float, default=0, help='simple gradient regularization weight value')
@@ -33,6 +34,8 @@ cmd_opt.add_argument('-lambda_db', type=float, default=0, help='double backpropa
 cmd_opt.add_argument('-track_jac', type=int, default=1, help='prints out norm of input output Jacobian during training')
 cmd_opt.add_argument('-permute_percent', type=float, default=0., help='the percentage of values in each target interpretation to switch around')
 cmd_opt.add_argument('-interps_version', type=int, default=0, help='controls how and from where the target interps were generated')
+cmd_opt.add_argument('-thresh', type=float, default=1., help='the threshold value to use on the target interpretations')
+cmd_opt.add_argument('-grad_abs', type=int, default=0, help='0 => abs(grad) will be used in loss, 1 => raw grad will be used')
 
 # for adversary
 cmd_opt.add_argument('-attack_type', type=str, default='PGD', help='which norm is used to bound adversary default l_inf')

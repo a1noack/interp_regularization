@@ -31,7 +31,7 @@ def cifar10(batch_size=128, augment=True):
     
     return train_loader, test_loader
     
-def mnist(batch_size=64):
+def mnist(batch_size=50):
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor()]
     )
@@ -52,19 +52,31 @@ def mnist(batch_size=64):
     
     return train_loader, test_loader
 
-def mnist_interps(batch_size=64, thresh=1., permute_percent=0., version=0):
-    if version == 0:
-        interp_type = 'smoothgrad'
-    elif version == 1:
-        interp_type = 'simple_gradient'
-    print(f'Using target interps generated using {interp_type}')
+def mnist_interps(batch_size=50, thresh=1., permute_percent=0., version=0):
+    if version == 1:
+        data_path = 'data/MNIST/random_net_gradients'
+    elif version == 2:
+        data_path = 'data/MNIST/pgdL2_eps1.5_iters40_simp_unproc'
+    elif version == 3:
+        data_path = 'data/MNIST/pgdL2_eps2.5_iters40_simp_unproc'
+    elif version == 4:
+        data_path = 'data/MNIST/pgdLinf_eps.3_iters40_simp_unproc'
+    elif version == 5:
+        data_path = 'data/MNIST/std_train_simp_unproc'
+    elif version == 6:
+        data_path = 'data/MNIST/pgdL2_eps1.5_iters40_smooth_unproc'
+    elif version == 7:
+        data_path = 'data/MNIST/std_train_smooth_unproc'
+    else:
+        raise RuntimeError(f'Target interps version {version} is not implemented yet: ')
+    print('Getting target interps dataset from:', data_path)
         
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor()]
     )
 
     train_loader = torch.utils.data.DataLoader(
-        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), 
+        tid.MNISTInterps(data_path, 
                          train=True, 
                          thresh=thresh,
                          permute_percent=permute_percent), 
@@ -73,7 +85,7 @@ def mnist_interps(batch_size=64, thresh=1., permute_percent=0., version=0):
     )
 
     test_loader = torch.utils.data.DataLoader(
-        tid.MNISTInterps('data/MNIST/SimpleCNN_at_{}'.format(interp_type), 
+        tid.MNISTInterps(data_path, 
                          train=False, 
                          thresh=thresh, 
                          permute_percent=permute_percent),
@@ -90,6 +102,12 @@ def cifar10_interps(batch_size=128, augment=True, thresh=1., permute_percent=0.,
         data_path = 'data/CIFAR-10/pgdL2_eps0.314_iters7_simp_unproc'
     elif version == 2:
         data_path = 'data/CIFAR-10/pgdL2_eps0.314_iters7_smooth_unproc'
+    elif version == 3:
+        data_path = 'data/CIFAR-10/std_train_simp_unproc'
+    elif version == 4:
+        data_path = 'data/CIFAR-10/std_train_smooth_unproc'
+    else:
+        raise RuntimeError(f'Target interps version {version} is not implemented yet: ')
     print('Getting target interps dataset from:', data_path)
         
     train_loader = torch.utils.data.DataLoader(

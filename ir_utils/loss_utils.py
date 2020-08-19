@@ -4,11 +4,11 @@ from torch.autograd import Variable
 from ir_utils.interp_generators import simple_gradient
 
 def frob_norm_jac(net, samples, n_classes, for_loss=True):
-    """Jacubovitz's 'Jacobian Regularizer'
+    """Jacubovitz's 'Jacobian Regularizer'. Computes full Jacobian for a minibatch of samples.
     
     Args:
         net: the DNN, a torch.nn.Module instance
-        samples: a minibatch of samples
+        samples: a minibatch of samples. Has shape BxCxHxW.
         n_classes: the number of classes for the dataset
         for_loss: if True, a computation graph is built so that we can backpropagate through a gradient
     Returns: 
@@ -16,10 +16,10 @@ def frob_norm_jac(net, samples, n_classes, for_loss=True):
             net w.r.t. the inputs
     """
     batch_size = samples.shape[0]
-    samples = Variable(samples.repeat_interleave(n_classes, 0), requires_grad=True)
+    samples = Variable(samples.repeat_interleave(n_classes, 0), requires_grad=True) # shape = ((n_classes*B), C, H, W)
     logits = net(samples)
     
-    grad_outputs = torch.eye(n_classes).repeat(batch_size, 1)
+    grad_outputs = torch.eye(n_classes).repeat(batch_size, 1) # shape = ((n_classes*B), n_classes)
     samples_grad = torch.autograd.grad(logits, samples, grad_outputs=grad_outputs, create_graph=for_loss)[0]
     jac_reg_loss = torch.norm(samples_grad, p='fro')
     
@@ -57,6 +57,8 @@ def cos_sim(samples, logits, labels, target_interps, for_loss=True, abs=False):
         target_interps: interpretations to align the gradients of the network at each sample with.
             Should have the same shape as samples. If not supplied, samples will be target_interps.
         for_loss: if True, a computation graph is built so that we can backpropagate through a gradient
+        abs: if True, the absolute value of the gradients will be computed before comparing
+            with the target interpretations.
     Returns: 
         cos_sim_loss: the average of the cosine similarity measures calculated between 
             the simple gradient salience maps and the samples
@@ -77,7 +79,7 @@ def cos_sim(samples, logits, labels, target_interps, for_loss=True, abs=False):
 
 def double_backprop(loss, samples, for_loss=True):
     """Drucker and LeCun's 'Double Backpropagation', 
-    Ross and Doshi-Velez's 'Input Gradient Regularization'
+    Ross and Doshi-Velez's 'Input Gradient Regularization'.
     
     Args:
         net: the DNN, a torch.nn.Module instance

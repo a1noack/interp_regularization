@@ -66,11 +66,13 @@ def simple_gradient(net, samples, labels, normalize=True, for_loss=False, rgb=Tr
     Returns: 
         A batch of simple gradient salience maps for the samples given.
     """
+    assert len(samples.size()) == 4 and len(labels.size()) == 1
+    
     samples = torch.autograd.Variable(samples, requires_grad=True)
-    net(samples)
+    logits = net(samples)
     
     grad_outputs = F.one_hot(labels, num_classes=10).float()
-    grads = torch.autograd.grad(net.logits, samples, grad_outputs=grad_outputs, create_graph=for_loss)[0]
+    grads = torch.autograd.grad(logits, samples, grad_outputs=grad_outputs, create_graph=for_loss)[0]
     
     if abs:
         salience_maps = torch.abs(grads)

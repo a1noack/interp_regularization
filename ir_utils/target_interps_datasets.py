@@ -9,7 +9,15 @@ import torch
 from PIL import Image
 
 def variable_permute(target_interps, perm_percent):
-    """Permutes perm_percent of the indices in target_interps."""
+    """Permutes perm_percent of the indices in target_interps.
+    
+    Args:
+        target_interps (torch.Tensor): usually shape NxCxHxW, where N is the number of samples in the
+            dataset. 
+        perm_percent (float): value between zero and one that represents the probability that any of the
+            any one of the C*H*W pixel values in each of the N samples will be swapped with another pixel values.
+            Note that permuting only happens *within* each sample, never across samples.
+    """
     n_elements = target_interps[0].nelement()
     n_perm = int(n_elements * perm_percent)
     shape = target_interps[0].shape
@@ -30,12 +38,13 @@ class MNISTInterps(VisionDataset):
                '5 - five', '6 - six', '7 - seven', '8 - eight', '9 - nine']
 
     def __init__(self, root, train=True, transform=None, target_transform=None, 
-                 interp_transform=None, thresh=None, permute_percent=0.):
+                 interp_transform=None, thresh=None, permute_percent=0., abs=False):
         super(MNISTInterps, self).__init__(root, transform=transform, target_transform=target_transform)
         self.train = train  # training set or test set
         self.interp_transform = interp_transform
         self.thresh = thresh
         self.permute_percent = permute_percent
+        self.abs = abs
 
         if self.train:
             data_file = 'training.pt'
@@ -43,8 +52,15 @@ class MNISTInterps(VisionDataset):
             data_file = 'test.pt'
         self.data, self.targets, self.target_interps = torch.load(os.path.join(root, data_file))
         
+        if thresh == -10:
+            thresh = None
+        print(f'Target interps threshold: {thresh}')
+        print(f'Target interps abs: {abs}')
+        
+        print(f'Permute percent for {os.path.splitext(data_file)[0]} set target interps: {permute_percent*100:.2f}%')
         if permute_percent > 0:
             variable_permute(self.target_interps, permute_percent)
+        
 
     def __getitem__(self, index):
         """
@@ -57,19 +73,24 @@ class MNISTInterps(VisionDataset):
         """
         img, target, target_interp = self.data[index], int(self.targets[index]), self.target_interps[index]
 
-        if self.transform is not None:
-            img = self.transform(img)
+#         if self.transform is not None:
+#             img = self.transform(img)
 
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+#         if self.target_transform is not None:
+#             target = self.target_transform(target)
         
-        if self.interp_transform is not None:
-            target_interp = self.interp_transform(target_interp)
+#         if self.interp_transform is not None:
+#             target_interp = self.interp_transform(target_interp)
         
         if self.thresh != None:
             std = target_interp.std()
             mean = target_interp.mean()
-            target_interp = torch.where(target_interp > mean + self.thresh * std, target_interp, torch.tensor([0.]).cpu())
+            top = torch.where(target_interp > mean + self.thresh * std, target_interp, torch.tensor([0.]).cpu())
+            if self.abs:
+                target_interp = top
+            else:
+                btm = torch.where(target_interp < mean - self.thresh * std, target_interp, torch.tensor([0.]).cpu())
+                target_interp = top + btm
 
         return img, target, target_interp
 
@@ -85,12 +106,13 @@ class CIFAR10Interps(VisionDataset):
     classes = ['0 - airplance', '1 - automobile', '2 - bird', '3 - cat', '4 - deer', 
                '5 - dog', '6 - frog', '7 - horse', '8 - ship', '9 - truck']
 
-    def __init__(self, root, train=True, augment=False, thresh=None, permute_percent=0.):
+    def __init__(self, root, train=True, augment=False, thresh=None, permute_percent=0., abs=False):
         super(CIFAR10Interps, self).__init__(root, transform=None, target_transform=None)
         self.train = train  # training set or test set
         self.thresh = thresh
         self.permute_percent = permute_percent
         self.augment = augment
+        self.abs = abs
 
         if self.train:
             file_names = [f'training{i}.pt' for i in range(5000, 50001, 5000)]
@@ -115,13 +137,25 @@ class CIFAR10Interps(VisionDataset):
             train_type = 'training'
         else:
             train_type = 'test'
-            
+        
+        if thresh == -10:
+            thresh = None
+        
         print(f'Target interps threshold: {thresh}')
         print(f'Permute percent for {train_type} set target interps: {permute_percent*100:.2f}%')
         if permute_percent > 0:
             variable_permute(self.target_interps, permute_percent)
     
     def joint_transform(self, img, target_interp):
+        """Randomly crops and horizontally flips two torch.Tensors in unison. The first one being the sample and 
+        second one being the target interpretation. 
+    
+        Args:
+            img (torch.Tensor): a sample from the CIFAR-10 dataset.
+            target_interp (torch.Tensor): the target interpretation for img
+        Returns: 
+            tuple: (img, target_interp) where img and target_interp are the transformed torch.Tensors
+        """
         img = F.pad(img, (4, 4, 4, 4), 'constant', 0)
         target_interp = F.pad(target_interp, (4, 4, 4, 4), 'constant', 0)
         
@@ -154,7 +188,12 @@ class CIFAR10Interps(VisionDataset):
         if self.thresh != None:
             std = target_interp.std()
             mean = target_interp.mean()
-            target_interp = torch.where(target_interp > mean + self.thresh * std, target_interp, torch.tensor([0.]).cpu())
+            top = torch.where(target_interp > mean + self.thresh * std, target_interp, torch.tensor([0.]).cpu())
+            if self.abs:
+                target_interp = top
+            else:
+                btm = torch.where(target_interp < mean - self.thresh * std, target_interp, torch.tensor([0.]).cpu())
+                target_interp = top + btm
 
         return img, target, target_interp
 
