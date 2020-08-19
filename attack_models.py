@@ -1,3 +1,4 @@
+import time
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -80,6 +81,10 @@ if len(attack_nums) == 0: attack_nums = list(range(len(attack_names)))
     
 n_repeat = int(input('\nEnter the number of times to repeat attack for each model:\n'))
 
+seconds_to_delay = int(input('\nEnter the number of hours to sleep before starting attacks:\n'))*60*60
+print('\nsleeping...')
+time.sleep(seconds_to_delay) # this is here so we can start attacks on models that haven't finished training yet
+
 for j, attack_name in enumerate(attack_names):
     if j not in attack_nums:
         continue
@@ -127,6 +132,7 @@ for j, attack_name in enumerate(attack_names):
             for h in range(n_repeat):
                 print(f'\tAttacking {seed}. ({h+1}/{n_repeat})')
                 test()
+            net.cpu()
             print('')
 
         # get adversarial test and standard accuracy
